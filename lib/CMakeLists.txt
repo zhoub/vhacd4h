@@ -1,0 +1,25 @@
+project(VHACD_LIB CXX C)
+include(${CMAKE_COMMON_INC})
+
+include(FindOpenCL)
+include(FindOpenMP)
+if(OPENMP_FOUND)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
+set(LIB_TYPE "STATIC" CACHE STRING "STATIC, SHARED or MODULE?")
+message("[VHACD] \t LIB_TYPE " ${LIB_TYPE})
+add_library(VHACD_LIB ${PROJECT_CPP_FILES} ${PROJECT_C_FILES} ${PROJECT_INC_FILES} ${PROJECT_INL_FILES} ${PROJECT_CL_FILES})
+
+if (OpenCL_FOUND)
+    include_directories("${OpenCL_INCLUDE_DIRS}")
+    add_definitions( -DOPENCL_FOUND=1 )
+    add_definitions( -DOPENCL_CL_FILES="${PROJECT_CL_FILES}" )
+endif()
+
+message("[VHACD] \t -> CMAKE_INSTALL_PREFIX " ${CMAKE_INSTALL_PREFIX})
+install(TARGETS VHACD_LIB DESTINATION bin)
+install(FILES ${PROJECT_INC_FILES} DESTINATION include)
+install(FILES ${PROJECT_INL_FILES} DESTINATION include)
+
