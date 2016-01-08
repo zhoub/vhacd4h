@@ -1,0 +1,93 @@
+FIND_PATH( HOUDINI_DIR REQUIRED )
+
+IF( MSVC )
+    ADD_DEFINITIONS( -DMAKING_DSO -DI386 -DWIN32 -DSWAP_BITFIELDS -D_WIN32_WINNT=0x0502 -DNOMINMAX -DSTRICT -DWIN32_LEAN_AND_MEAN -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -DBOOST_ALL_NO_LIB -DSESI_LITTLE_ENDIAN $(ARCHDEFS) -DFBX_ENABLED=1 -DOPENCL_ENABLED=1 -DOPENVDB_ENABLED=1 -DOPENEXR_DLL )
+
+    # Setup for Houdini
+    SET( HOUDINI_INCLUDE_DIR "${HOUDINI_DIR}/toolkit/include" )
+    SET( HOUDINI_LIBRARY_DIR "${HOUDINI_DIR}/custom/houdini/dsolib" )
+
+    SET( HOUDINI_LIBRARIES
+        "${HOUDINI_LIBRARY_DIR}/tbb.lib"
+        "${HOUDINI_LIBRARY_DIR}/libCH.a"
+        "${HOUDINI_LIBRARY_DIR}/libCMD.a"
+        "${HOUDINI_LIBRARY_DIR}/libGA.a"
+        "${HOUDINI_LIBRARY_DIR}/libGEO.a"
+        "${HOUDINI_LIBRARY_DIR}/libGT.a"
+        "${HOUDINI_LIBRARY_DIR}/libGU.a"
+        "${HOUDINI_LIBRARY_DIR}/libGUI.a"
+        "${HOUDINI_LIBRARY_DIR}/libGSTY.a"
+        "${HOUDINI_LIBRARY_DIR}/libUT.a"
+        "${HOUDINI_LIBRARY_DIR}/libFS.a"
+        "${HOUDINI_LIBRARY_DIR}/libSYS.a"
+        "${HOUDINI_LIBRARY_DIR}/libOP.a"
+        "${HOUDINI_LIBRARY_DIR}/libOBJ.a"
+        "${HOUDINI_LIBRARY_DIR}/libSOP.a"
+        "${HOUDINI_LIBRARY_DIR}/libSTY.a"
+        "${HOUDINI_LIBRARY_DIR}/libPRM.a"
+        "${HOUDINI_LIBRARY_DIR}/libROP.a"
+        "${HOUDINI_LIBRARY_DIR}/libPY.a"
+        "${HOUDINI_LIBRARY_DIR}/libPYP.a"
+        "${HOUDINI_LIBRARY_DIR}/libVRAY.a" )
+ELSEIF( APPLE )
+    ADD_DEFINITIONS( -DMAKING_DSO
+        -DVERSION=\"15.0.274\"
+        -D_GNU_SOURCE -DMBSD
+        -DMBSD_COCOA
+        -DMBSD_INTEL
+        -arch x86_64
+        -DAMD64
+        -fPIC
+        -DSIZEOF_VOID_P=8
+        -DFBX_ENABLED=1
+        -DOPENCL_ENABLED=1
+        -DOPENVDB_ENABLED=1
+        -DSESI_LITTLE_ENDIAN
+        -DENABLE_THREADS
+        -DUSE_PTHREADS
+        -D_REENTRANT
+        -D_FILE_OFFSET_BITS=64
+        -DGCC4 -DGCC3
+        -Wno-deprecated
+        -std=c++11
+        -Wall -W -Wno-parentheses -Wno-sign-compare -Wno-reorder -Wno-uninitialized -Wunused -Wno-unused-parameter )
+    SET( HOUDINI_INCLUDE_DIR "${HOUDINI_DIR}/Resources/toolkit/include" )
+    SET( HOUDINI_LIBRARY_DIR "${HOUDINI_DIR}/Libraries" )
+
+    SET( HOUDINI_LIBRARIES
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniGEO.dylib"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniOP1.dylib"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniOP2.dylib"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniOP3.dylib"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniOPZ.dylib"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniPRM.dylib"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniUT.dylib"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniRAY.dylib"
+        "${HOUDINI_LIBRARY_DIR}/libboost_system.dylib"
+        "${HOUDINI_LIBRARY_DIR}/libtbb.dylib" )
+ELSE()
+    ADD_DEFINITIONS( -DMAKING_DSO -DVERSION=\"15.0.244.16\" -D_GNU_SOURCE -DLINUX -DAMD64 -m64 -fPIC -DSIZEOF_VOID_P=8 -DFBX_ENABLED=1 -DOPENCL_ENABLED=1 -DOPENVDB_ENABLED=1 -DSESI_LITTLE_ENDIAN -DENABLE_THREADS -DUSE_PTHREADS -D_REENTRANT -D_FILE_OFFSET_BITS=64 -DGCC4 -DGCC3 -Wno-deprecated -std=c++0x -Wall -W -Wno-parentheses -Wno-sign-compare -Wno-reorder -Wno-uninitialized -Wunused -Wno-unused-parameter -fno-strict-aliasing -DBOOST_ALL_NO_LIB )
+
+    SET( HOUDINI_INCLUDE_DIR "${HOUDINI_DIR}/toolkit/include" )
+    SET( HOUDINI_LIBRARY_DIR "${HOUDINI_DIR}/dsolib" )
+    
+    SET( HOUDINI_LIBRARIES
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniGEO.so"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniOPZ.so"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniPRM.so"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniUT.so"
+        "${HOUDINI_LIBRARY_DIR}/libHoudiniRAY.so"
+        "" )
+ENDIF()
+
+INCLUDE_DIRECTORIES( ${HOUDINI_INCLUDE_DIR} )
+LINK_DIRECTORIES( ${HOUDINI_LIBRARY_DIR} )
+
+ADD_LIBRARY( HACD SHARED HACD.cpp )
+TARGET_LINK_LIBRARIES( HACD ${HOUDINI_LIBRARIES} )
+
+IF(MSVC)
+    INSTALL( TARGETS HACD RUNTIME DESTINATION bin )
+ELSE()
+    INSTALL( TARGETS HACD LIBRARY DESTINATION bin )
+ENDIF()
