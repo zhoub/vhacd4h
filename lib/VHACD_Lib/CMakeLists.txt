@@ -1,8 +1,7 @@
-project(VHACD_LIB CXX C)
-include(${CMAKE_COMMON_INC})
-
 include(FindOpenCL)
-include(FindOpenMP)
+if(NOT APPLE)
+    include(FindOpenMP)
+endif()
 if(OPENMP_FOUND)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -10,7 +9,14 @@ if(OPENMP_FOUND)
 endif()
 set(LIB_TYPE "STATIC" CACHE STRING "STATIC, SHARED or MODULE?")
 message("[VHACD] \t LIB_TYPE " ${LIB_TYPE})
-add_library(VHACD_LIB ${PROJECT_CPP_FILES} ${PROJECT_C_FILES} ${PROJECT_INC_FILES} ${PROJECT_INL_FILES} ${PROJECT_CL_FILES})
+
+file(GLOB PROJECT_CL_FILES "cl/*")
+file(GLOB PROJECT_INC_FILES "inc/*")
+file(GLOB PROJECT_PUBLIC_FILES "public/*")
+file(GLOB PROJECT_SRC_FILES "src/*")
+
+include_directories( "${CMAKE_CURRENT_SOURCE_DIR}/inc" )
+add_library(VHACD_LIB ${PROJECT_CL_FILES} ${PROJECT_INC_FILES} ${PROJECT_PUBLIC_FILES} ${PROJECT_SRC_FILES})
 
 if (OpenCL_FOUND)
     include_directories("${OpenCL_INCLUDE_DIRS}")
@@ -20,6 +26,6 @@ endif()
 
 message("[VHACD] \t -> CMAKE_INSTALL_PREFIX " ${CMAKE_INSTALL_PREFIX})
 install(TARGETS VHACD_LIB DESTINATION bin)
+install(FILES ${PROJECT_PUBLIC_FILES} DESTINATION include)
 install(FILES ${PROJECT_INC_FILES} DESTINATION include)
-install(FILES ${PROJECT_INL_FILES} DESTINATION include)
 
