@@ -1,5 +1,7 @@
+#include <GEO/GEO_PrimPoly.h>
 #include <GU/GU_Detail.h>
 #include <GA/GA_Handle.h>
+#include <GA/GA_ElementGroup.h>
 #include <OP/OP_AutoLockInputs.h>
 #include <OP/OP_Director.h>
 #include <OP/OP_Operator.h>
@@ -49,6 +51,37 @@ SOP_HACD::~SOP_HACD()
 
 OP_ERROR SOP_HACD::cookMySop(OP_Context &context)
 {
+    /*
+    OP_AutoLockInputs inputs(this);
+    if (inputs.lock(context) >= UT_ERROR_ABORT)
+        return error();
+
+    //
+    duplicateSource(0, context);
+    */
+
+    GEO_PrimPoly *quad = GEO_PrimPoly::build(gdp, 4, GU_POLY_CLOSED);
+    GA_Offset offset = -1;
+
+    offset = quad->getPointOffset(0);
+    gdp->setPos3(offset, UT_Vector3(-1, 0, -1));
+
+    offset = quad->getPointOffset(1);
+    gdp->setPos3(offset, UT_Vector3(1, 0, -1));
+
+    offset = quad->getPointOffset(2);
+    gdp->setPos3(offset, UT_Vector3(1, 0, 1));
+
+    offset = quad->getPointOffset(3);
+    gdp->setPos3(offset, UT_Vector3(-1, 0, 1));
+
+    //
+    GA_PrimitiveGroup *quadGroup = gdp->newPrimitiveGroup("quad");
+    quadGroup->addIndex(GA_Index(0));
+    quadGroup->addIndex(GA_Index(1));
+    quadGroup->addIndex(GA_Index(2));
+    quadGroup->addIndex(GA_Index(3));
+
     return error();
 }
 
@@ -58,7 +91,8 @@ void newSopOperator(OP_OperatorTable *table)
                                        "HACD",
                                        SOP_HACD::myConstructor,
                                        SOP_HACD::myTemplateList,
-                                       1,
-                                       1,
-                                       0));
+                                       0,
+                                       0,
+                                       NULL,
+                                       OP_FLAG_GENERATOR));
 }
