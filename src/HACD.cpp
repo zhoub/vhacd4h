@@ -1,4 +1,7 @@
+#include <iomanip>
+
 #include <GEO/GEO_PrimPoly.h>
+#include <GEO/GEO_PrimPolySoup.h>
 #include <GU/GU_Detail.h>
 #include <GA/GA_Handle.h>
 #include <GA/GA_ElementGroup.h>
@@ -15,6 +18,45 @@
 #include <vhacdTimer.h>
 #include <vhacdVolume.h>
 #include <vhacdVHACD.h>
+
+class StdCallback : public VHACD::IVHACD::IUserCallback
+{
+public:
+    StdCallback()
+    {
+    }
+    ~StdCallback()
+    {
+    }
+
+    void Update(const double overallProgress,
+                const double stageProgress,
+                const double operationProgress,
+                const char * const stage,
+                const char * const operation)
+    {
+        std::cout << std::setfill(' ') << std::setw(3) << (int)(overallProgress  +0.5) << "% "
+             << "[ " << stage     << " " << std::setfill(' ') << std::setw(3) << (int)(stageProgress    +0.5) << "% ] "
+                     << operation << " " << std::setfill(' ') << std::setw(3) << (int)(operationProgress+0.5) << "%" << std::endl;
+    };
+};
+
+class StdLogger : public VHACD::IVHACD::IUserLogger
+{
+public:
+    StdLogger()
+    {
+    }
+
+    ~StdLogger()
+    {
+    }
+
+    void Log(const char * const msg)
+    {
+        std::cout << msg;
+    }
+};
 
 class SOP_HACD : public SOP_Node
 {
@@ -33,8 +75,16 @@ protected:
 
 private:
 
+    void evalParams(fpreal time);
+
     VHACD::IVHACD::Parameters myHacdParams;
+
+    static StdCallback myCallback;
+    static StdLogger myLogger;
 };
+
+StdCallback SOP_HACD::myCallback;
+StdLogger SOP_HACD::myLogger;
 
 //
 static PRM_Name resolutionName("resolution", "Resolution");
@@ -112,9 +162,12 @@ OP_Node * SOP_HACD::myConstructor(OP_Network *net, const char *name, OP_Operator
 
 SOP_HACD::SOP_HACD(OP_Network *net, const char *name, OP_Operator *op)
     :
-    SOP_Node(net, name, op)
+    SOP_Node(net, name, op),
+    myHacdParams()
 {
     myHacdParams.m_oclAcceleration = false;
+    myHacdParams.m_logger = &myLogger;
+    myHacdParams.m_callback = &myCallback;
 }
 
 SOP_HACD::~SOP_HACD()
@@ -130,7 +183,7 @@ OP_ERROR SOP_HACD::cookMySop(OP_Context &context)
     //
     duplicateSource(0, context);
 
-    std::vector<double> pointVec;
+    std::vector<float> pointVec;
     pointVec.reserve(gdp->getNumPoints() * 3);
 
     const GA_Attribute * attrP = gdp->getP();
@@ -138,6 +191,7 @@ OP_ERROR SOP_HACD::cookMySop(OP_Context &context)
     const GA_Range rangeP = detailP.getPointRange();
 
     UT_ValArray<UT_Vector3> arrayP;
+        detailP.getPos3AsArray(rangeP, arrayP);
     for (UT_ValArray<UT_Vector3>::const_iterator itr = arrayP.begin(); itr != arrayP.end(); ++ itr)
     {
         pointVec.push_back(itr->x());
@@ -167,45 +221,63 @@ OP_ERROR SOP_HACD::cookMySop(OP_Context &context)
     gdp->clear();
 
     //
+    evalParams(context.getTime());
     VHACD::IVHACD * interfaceVHACD = VHACD::CreateVHACD();
 
     bool success = interfaceVHACD->Compute(&pointVec[0], 3, pointVec.size() / 3, &idxVec[0], 3, idxVec.size() / 3, myHacdParams);
     if (success)
     {
-        std::cout << interfaceVHACD->GetNConvexHulls() << std::endl;
+        const unsigned int numCH = interfaceVHACD->GetNConvexHulls();
+        for (unsigned int i = 0; i < 1; ++ i)
+        {
+            VHACD::IVHACD::ConvexHull ch;
+            interfaceVHACD->GetConvexHull(i, ch);
+
+            //
+            std::vector<GA_Offset> pOffsets(ch.m_nPoints, -1);
+            for (unsigned int p = 0; p < ch.m_nPoints; ++ p)
+            {
+                GA_Offset p_offset = gdp->appendPointOffset();
+                pOffsets[p] = p_offset;
+                gdp->setPos3(p_offset, UT_Vector3(ch.m_points[p], ch.m_points[p + 1], ch.m_points[p + 2]));
+            }
+
+            for (unsigned int t = 0; t < ch.m_nTriangles; ++ t)
+            {
+                GEO_PrimPoly *tri = GEO_PrimPoly::build(gdp, 3, GU_POLY_CLOSED);
+                tri->appendVertex(pOffsets[ch.m_triangles[t * 3 + 0]]);
+                tri->appendVertex(pOffsets[ch.m_triangles[t * 3 + 1]]);
+                tri->appendVertex(pOffsets[ch.m_triangles[t * 3 + 2]]);
+            }
+        }
     }
     else
     {
-        addError(SOP_MESSAGE, "Computed failed");
+        addError(SOP_MESSAGE, "Computation failed");
     }
 
     interfaceVHACD->Clean();
     interfaceVHACD->Release();
 
-    //
-    GEO_PrimPoly *quad = GEO_PrimPoly::build(gdp, 4, GU_POLY_CLOSED);
-    GA_Offset offset = -1;
-
-    offset = quad->getPointOffset(0);
-    gdp->setPos3(offset, UT_Vector3(-1, 0, -1));
-
-    offset = quad->getPointOffset(1);
-    gdp->setPos3(offset, UT_Vector3(1, 0, -1));
-
-    offset = quad->getPointOffset(2);
-    gdp->setPos3(offset, UT_Vector3(1, 0, 1));
-
-    offset = quad->getPointOffset(3);
-    gdp->setPos3(offset, UT_Vector3(-1, 0, 1));
-
-    //
-    GA_PrimitiveGroup *quadGroup = gdp->newPrimitiveGroup("quad");
-    quadGroup->addIndex(GA_Index(0));
-    quadGroup->addIndex(GA_Index(1));
-    quadGroup->addIndex(GA_Index(2));
-    quadGroup->addIndex(GA_Index(3));
-
     return error();
+}
+
+void SOP_HACD::evalParams(fpreal time)
+{
+    myHacdParams.m_resolution = evalInt(resolutionName.getToken(), 0, time);
+    myHacdParams.m_depth = evalInt(depthName.getToken(), 0, time);
+    myHacdParams.m_concavity = evalFloat(concavityName.getToken(), 0, time);
+    myHacdParams.m_delta = evalFloat(deltaName.getToken(), 0, time);
+    myHacdParams.m_planeDownsampling = evalInt(planeDownsamplingName.getToken(), 0, time);
+    myHacdParams.m_convexhullDownsampling = evalInt(convexhullDownsamplingName.getToken(), 0, time);
+    myHacdParams.m_alpha = evalFloat(alphaName.getToken(),0, time);
+    myHacdParams.m_beta = evalFloat(betaName.getToken(), 0, time);
+    myHacdParams.m_gamma = evalFloat(gammaName.getToken(), 0, time);
+    myHacdParams.m_pca = evalInt(pcaName.getToken(), 0, time);
+    myHacdParams.m_mode = evalInt(modeName.getToken(), 0, time);
+    myHacdParams.m_maxNumVerticesPerCH = evalInt(maxNumVerticesPerCHName.getToken(), 0, time);
+    myHacdParams.m_minVolumePerCH = evalFloat(minVolumePerChName.getToken(), 0, time);
+    myHacdParams.m_convexhullApproximation = evalInt(convexhullApproximationName.getToken(), 0, time);
 }
 
 void newSopOperator(OP_OperatorTable *table)
