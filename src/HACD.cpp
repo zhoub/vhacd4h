@@ -241,14 +241,23 @@ OP_ERROR SOP_HACD::cookMySop(OP_Context &context)
             }
 
             //
+            UT_String pointGroupName;
+            pointGroupName.sprintf("chPoints_%u", i);
+            GA_PointGroup *pointsGroup = gdp->newPointGroup(pointGroupName);
+
+            UT_String primGroupName;
+            primGroupName.sprintf("chPrims_%u", i);
+            GA_PrimitiveGroup *primsGroup = gdp->newPrimitiveGroup(primGroupName);
+
             std::vector<GA_Offset> pOffsets;
             pOffsets.reserve(ch.m_nPoints);
             for (unsigned int p = 0; p < ch.m_nPoints * 3; p += 3)
             {
-                GA_Offset p_offset = gdp->appendPointOffset();
-                pOffsets.push_back(p_offset);
+                GA_Offset pOffset = gdp->appendPointOffset();
+                pOffsets.push_back(pOffset);
                 const UT_Vector3 point(ch.m_points[p], ch.m_points[p + 1], ch.m_points[p + 2]);
-                gdp->setPos3(p_offset, point);
+                gdp->setPos3(pOffset, point);
+                pointsGroup->addOffset(pOffset);
             }
 
             for (unsigned int t = 0; t < ch.m_nTriangles * 3; t += 3)
@@ -259,6 +268,7 @@ OP_ERROR SOP_HACD::cookMySop(OP_Context &context)
                 tri->appendVertex(pOffsets[ch.m_triangles[t + 1]]);
                 tri->appendVertex(pOffsets[ch.m_triangles[t + 2]]);
                 tri->close();
+                primsGroup->add(tri);
             }
         }
     }
