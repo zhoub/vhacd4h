@@ -225,29 +225,40 @@ OP_ERROR SOP_HACD::cookMySop(OP_Context &context)
     VHACD::IVHACD * interfaceVHACD = VHACD::CreateVHACD();
 
     bool success = interfaceVHACD->Compute(&pointVec[0], 3, pointVec.size() / 3, &idxVec[0], 3, idxVec.size() / 3, myHacdParams);
-    if (success)
+    if (success && interfaceVHACD->GetNConvexHulls())
     {
-        const unsigned int numCH = interfaceVHACD->GetNConvexHulls();
-        for (unsigned int i = 0; i < 1; ++ i)
+        for (unsigned int i = 0; i < interfaceVHACD->GetNConvexHulls(); ++ i)
         {
             VHACD::IVHACD::ConvexHull ch;
+            ch.m_nPoints = 0;
+            ch.m_points = NULL;
+            ch.m_nTriangles = 0;
+            ch.m_triangles = NULL;
             interfaceVHACD->GetConvexHull(i, ch);
-
-            //
-            std::vector<GA_Offset> pOffsets(ch.m_nPoints, -1);
-            for (unsigned int p = 0; p < ch.m_nPoints; ++ p)
+            if(! ch.m_nPoints || ! ch.m_nTriangles)
             {
-                GA_Offset p_offset = gdp->appendPointOffset();
-                pOffsets[p] = p_offset;
-                gdp->setPos3(p_offset, UT_Vector3(ch.m_points[p], ch.m_points[p + 1], ch.m_points[p + 2]));
+                continue;
             }
 
-            for (unsigned int t = 0; t < ch.m_nTriangles; ++ t)
+            //
+            std::vector<GA_Offset> pOffsets;
+            pOffsets.reserve(ch.m_nPoints);
+            for (unsigned int p = 0; p < ch.m_nPoints * 3; p += 3)
             {
-                GEO_PrimPoly *tri = GEO_PrimPoly::build(gdp, 3, GU_POLY_CLOSED);
-                tri->appendVertex(pOffsets[ch.m_triangles[t * 3 + 0]]);
-                tri->appendVertex(pOffsets[ch.m_triangles[t * 3 + 1]]);
-                tri->appendVertex(pOffsets[ch.m_triangles[t * 3 + 2]]);
+                GA_Offset p_offset = gdp->appendPointOffset();
+                pOffsets.push_back(p_offset);
+                const UT_Vector3 point(ch.m_points[p], ch.m_points[p + 1], ch.m_points[p + 2]);
+                gdp->setPos3(p_offset, point);
+            }
+
+            for (unsigned int t = 0; t < ch.m_nTriangles * 3; t += 3)
+            {
+                GEO_PrimPoly *tri = static_cast<GEO_PrimPoly *>(gdp->appendPrimitive(GEO_PRIMPOLY));
+                tri->setSize(0);
+                tri->appendVertex(pOffsets[ch.m_triangles[t + 0]]);
+                tri->appendVertex(pOffsets[ch.m_triangles[t + 1]]);
+                tri->appendVertex(pOffsets[ch.m_triangles[t + 2]]);
+                tri->close();
             }
         }
     }
