@@ -27,6 +27,8 @@
 
 #include <iomanip>
 
+#include <CL/cl.h>
+
 #include <GEO/GEO_PrimPoly.h>
 #include <GEO/GEO_PrimPolySoup.h>
 #include <GU/GU_Detail.h>
@@ -106,10 +108,14 @@ private:
 
     VHACD::IVHACD::Parameters myHacdParams;
 
+    static cl_device_id myCLDeviceId;
+    static VHACD::IVHACD *interfaceVHACD;
     static StdCallback myCallback;
     static StdLogger myLogger;
 };
 
+cl_device_id SOP_HACD::myCLDeviceId = NULL;
+VHACD::IVHACD *SOP_HACD::interfaceVHACD = NULL;
 StdCallback SOP_HACD::myCallback;
 StdLogger SOP_HACD::myLogger;
 
@@ -192,9 +198,51 @@ SOP_HACD::SOP_HACD(OP_Network *net, const char *name, OP_Operator *op)
     SOP_Node(net, name, op),
     myHacdParams()
 {
-    myHacdParams.m_oclAcceleration = false;
+    bool useOpenCL = false;
+#ifdef USE_OPENCL
+    useOpenCL = true;
+#endif
+    myHacdParams.m_oclAcceleration = useOpenCL;
     myHacdParams.m_logger = &myLogger;
     myHacdParams.m_callback = &myCallback;
+
+    if (! interfaceVHACD )
+    {
+        interfaceVHACD = VHACD::CreateVHACD();
+        if (useOpenCL)
+        {
+            if (! myCLDeviceId)
+            {
+                cl_platform_id platformIds[2] = {NULL, NULL};
+                cl_uint numPlatforms = 0;
+                clGetPlatformIDs(2, platformIds, &numPlatforms);
+                for (cl_uint i = 0; i < numPlatforms; ++ i)
+                {
+                    char buf[2048];
+                    memset(buf, '\0', 2048);
+                    clGetPlatformInfo(platformIds[i], CL_PLATFORM_NAME, 2048, buf, NULL);
+                    std::cout << "HACD : Found OpenCL platform " << i << " [" << buf << "]" << std::endl;
+                }
+
+                if (numPlatforms)
+                {
+                    cl_uint numDevices = 0;
+                    for (cl_uint i = 0; i < numPlatforms; ++ i)
+                    {
+                        if (clGetDeviceIDs(platformIds[i], CL_DEVICE_TYPE_ALL, 1, &myCLDeviceId, &numDevices) == CL_SUCCESS)
+                        {
+                            std::cout << "HACD : Choosed platform " << i << std::endl;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (myCLDeviceId)
+            {
+                interfaceVHACD->OCLInit(&myCLDeviceId, &myLogger);
+            }
+        }
+    }
 }
 
 SOP_HACD::~SOP_HACD()
@@ -218,7 +266,7 @@ OP_ERROR SOP_HACD::cookMySop(OP_Context &context)
     const GA_Range rangeP = detailP.getPointRange();
 
     UT_ValArray<UT_Vector3> arrayP;
-        detailP.getPos3AsArray(rangeP, arrayP);
+    detailP.getPos3AsArray(rangeP, arrayP);
     for (UT_ValArray<UT_Vector3>::const_iterator itr = arrayP.begin(); itr != arrayP.end(); ++ itr)
     {
         pointVec.push_back(itr->x());
@@ -249,7 +297,6 @@ OP_ERROR SOP_HACD::cookMySop(OP_Context &context)
 
     //
     evalParams(context.getTime());
-    VHACD::IVHACD * interfaceVHACD = VHACD::CreateVHACD();
 
     bool success = interfaceVHACD->Compute(&pointVec[0], 3, pointVec.size() / 3, &idxVec[0], 3, idxVec.size() / 3, myHacdParams);
     if (success && interfaceVHACD->GetNConvexHulls())
@@ -305,7 +352,6 @@ OP_ERROR SOP_HACD::cookMySop(OP_Context &context)
     }
 
     interfaceVHACD->Clean();
-    interfaceVHACD->Release();
 
     return error();
 }

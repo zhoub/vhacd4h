@@ -1,11 +1,9 @@
-FIND_PATH( HOUDINI_DIR REQUIRED )
+IF ( USE_OPENCL )
+	ADD_DEFINITIONS( -DUSE_OPENCL )
+ENDIF()
 
 IF( MSVC )
     ADD_DEFINITIONS( -DMAKING_DSO -DI386 -DWIN32 -DSWAP_BITFIELDS -D_WIN32_WINNT=0x0502 -DNOMINMAX -DSTRICT -DWIN32_LEAN_AND_MEAN -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -DBOOST_ALL_NO_LIB -DSESI_LITTLE_ENDIAN $(ARCHDEFS) -DFBX_ENABLED=1 -DOPENCL_ENABLED=1 -DOPENVDB_ENABLED=1 -DOPENEXR_DLL )
-
-    # Setup for Houdini
-    SET( HOUDINI_INCLUDE_DIR "${HOUDINI_DIR}/toolkit/include" )
-    SET( HOUDINI_LIBRARY_DIR "${HOUDINI_DIR}/custom/houdini/dsolib" )
 
     SET( HOUDINI_LIBRARIES
         "${HOUDINI_LIBRARY_DIR}/boost_system-vc110-mt-1_55.lib"
@@ -32,7 +30,7 @@ IF( MSVC )
         "${HOUDINI_LIBRARY_DIR}/libVRAY.a" )
 ELSEIF( APPLE )
     ADD_DEFINITIONS( -DMAKING_DSO
-        -DVERSION=\"15.0.274\"
+        -DVERSION=\"15.0.416\"
         -D_GNU_SOURCE -DMBSD
         -DMBSD_COCOA
         -DMBSD_INTEL
@@ -52,8 +50,6 @@ ELSEIF( APPLE )
         -Wno-deprecated
         -std=c++11
         -Wall -W -Wno-parentheses -Wno-sign-compare -Wno-reorder -Wno-uninitialized -Wunused -Wno-unused-parameter )
-    SET( HOUDINI_INCLUDE_DIR "${HOUDINI_DIR}/Resources/toolkit/include" )
-    SET( HOUDINI_LIBRARY_DIR "${HOUDINI_DIR}/Libraries" )
 
     SET( HOUDINI_LIBRARIES
         "${HOUDINI_LIBRARY_DIR}/libHoudiniGEO.dylib"
@@ -67,10 +63,7 @@ ELSEIF( APPLE )
         "${HOUDINI_LIBRARY_DIR}/libboost_system.dylib"
         "${HOUDINI_LIBRARY_DIR}/libtbb.dylib" )
 ELSE()
-    ADD_DEFINITIONS( -DMAKING_DSO -DVERSION=\"15.0.244.16\" -D_GNU_SOURCE -DLINUX -DAMD64 -m64 -fPIC -DSIZEOF_VOID_P=8 -DFBX_ENABLED=1 -DOPENCL_ENABLED=1 -DOPENVDB_ENABLED=1 -DSESI_LITTLE_ENDIAN -DENABLE_THREADS -DUSE_PTHREADS -D_REENTRANT -D_FILE_OFFSET_BITS=64 -DGCC4 -DGCC3 -Wno-deprecated -std=c++0x -Wall -W -Wno-parentheses -Wno-sign-compare -Wno-reorder -Wno-uninitialized -Wunused -Wno-unused-parameter -fno-strict-aliasing -DBOOST_ALL_NO_LIB )
-
-    SET( HOUDINI_INCLUDE_DIR "${HOUDINI_DIR}/toolkit/include" )
-    SET( HOUDINI_LIBRARY_DIR "${HOUDINI_DIR}/dsolib" )
+    ADD_DEFINITIONS( -DMAKING_DSO -DVERSION=\"15.0.416\" -D_GNU_SOURCE -DLINUX -DAMD64 -m64 -fPIC -DSIZEOF_VOID_P=8 -DFBX_ENABLED=1 -DOPENCL_ENABLED=1 -DOPENVDB_ENABLED=1 -DSESI_LITTLE_ENDIAN -DENABLE_THREADS -DUSE_PTHREADS -D_REENTRANT -D_FILE_OFFSET_BITS=64 -DGCC4 -DGCC3 -Wno-deprecated -std=c++0x -Wall -W -Wno-parentheses -Wno-sign-compare -Wno-reorder -Wno-uninitialized -Wunused -Wno-unused-parameter -fno-strict-aliasing -DBOOST_ALL_NO_LIB )
     
     SET( HOUDINI_LIBRARIES
         "${HOUDINI_LIBRARY_DIR}/libHoudiniGEO.so"
@@ -79,6 +72,10 @@ ELSE()
         "${HOUDINI_LIBRARY_DIR}/libHoudiniUT.so"
         "${HOUDINI_LIBRARY_DIR}/libHoudiniRAY.so"
         "" )
+ENDIF()
+
+IF (USE_OPENCL)
+	SET( HOUDINI_LIBRARIES ${HOUDINI_LIBRARIES} ${OpenCL_LIBRARY})
 ENDIF()
 
 INCLUDE_DIRECTORIES( ${HOUDINI_INCLUDE_DIR} ${CMAKE_INSTALL_PREFIX}/include )
