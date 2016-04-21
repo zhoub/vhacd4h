@@ -202,7 +202,6 @@ SOP_HACD::SOP_HACD(OP_Network *net, const char *name, OP_Operator *op)
 #ifdef USE_OPENCL
     useOpenCL = true;
 #endif
-    myHacdParams.m_oclAcceleration = useOpenCL;
     myHacdParams.m_logger = &myLogger;
     myHacdParams.m_callback = &myCallback;
 
@@ -239,7 +238,10 @@ SOP_HACD::SOP_HACD(OP_Network *net, const char *name, OP_Operator *op)
             }
             if (myCLDeviceId)
             {
-                interfaceVHACD->OCLInit(&myCLDeviceId, &myLogger);
+                if (interfaceVHACD->OCLInit(&myCLDeviceId, &myLogger))
+                {
+                    myHacdParams.m_oclAcceleration = true;
+                }
             }
         }
     }
